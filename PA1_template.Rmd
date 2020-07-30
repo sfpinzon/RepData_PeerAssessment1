@@ -1,25 +1,70 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Markdown Peer Assesment 1"
+author: "Sebastian F Pinzon"
+date: "7/29/2020"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+```
 
-## Loading and preprocessing the data
+## Loading data
+After extracting the zip file into the work directory, the following code was used to load the data in R. 
 
+```{r load}
+library(dplyr)
+data=read.csv('activity.csv')
+```
 
+## Find daily mean and median of steps
+The code below creates and histogram for total steps taken in a day and finds the mean and median daily steps. 
+Missing values were ignored for the mean and median calculations:
+```{r mean}
+library(ggplot2)
+daily=data%>%group_by(date)%>%summarize(total=sum(steps, na.rm = T))
+qplot(daily$total, geom="histogram", xlab="Total Daily Steps")
 
-## What is mean total number of steps taken per day?
+mean=daily%>%summarize(mean=mean(total, na.rm=T))
+median=daily%>%summarize(mean=median(total, na.rm=T))
+```
+The daily steps mean is `r mean` and the median is `r median`.
 
+## Analyzing Activity per Interval
+Code below creates a line plot for the average activity per time interval throughout the day and finds the interval with the most activity. 
+```{r time}
+interval=data%>%group_by(interval)%>%summarize(mean=mean(steps,na.rm=T))
+qplot(interval$interval, interval$mean, geom="line", xlab="Minute Interval", 
+      ylab="Mean Steps", main = "Mean Number of Steps Across Time Intervals")
+maxint=interval%>%filter(mean==max(mean))
+```
+The interval with the most activity is `r maxint[1]`. 
 
+## Handling missing values
+The code below finds the total number of missing values and imputes the missing values into a new data set by filling in with the interval mean. It also creates a new histogram with imputed values, and calculates the new mean and median. 
 
-## What is the average daily activity pattern?
+```{r nas}
+nas=sum(is.na(data$steps))
+data2=merge(data, interval)
+meanrep=data2$mean[is.na(data2$steps)]
+data2$steps=replace(data2$steps,is.na(data2$steps),meanrep)
+daily2=data2%>%group_by(date)%>%summarize(total=sum(steps))
+qplot(daily2$total, geom="histogram", xlab="Total Daily Steps")
 
+mean2=daily%>%summarize(mean=mean(total))
+median2=daily%>%summarize(mean=median(total))
+```
+The total number of missing step entries is `r nas`. The new mean with imputed missing values is `r mean2` and the median is `r median2`. 
 
+## Weekly Patterns
 
-## Imputing missing values
+The code below creates a factor variable to label days as weekdays or weekend. Then, it creates a new data frame where the average steps in a time interval is calculated for weekdays and weekend days. The plot below shows the activity pattern change between the two periods. 
 
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+```{r week}
+data2=data2[order(data2$date,data2$interval),]
+data2$day=weekdays(as.Date(data2$date))
+data2$week=as.factor(ifelse(data2$day=="Saturday"|data2$day=="Sunday", "weekend", "weekday"))
+dfplot=data2%>%group_by(week,interval)%>%summarize(mean=mean(steps))
+g<-ggplot(dfplot, aes(interval,mean))+geom_line()
+g+facet_grid(rows=vars(week))
+```
